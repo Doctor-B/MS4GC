@@ -1,12 +1,3 @@
-MS4GC Version 1.04
-command = MS4GC -file examples/bit_signal_0011010 0011010
-language = en
-timebase: 1.0 [ms]
-edgepos = center
-interval = 20.0 [ms]
-ramp = 1%
-high = 5.0 [V]
-low = 0.0 [V]
 0.0 0.0
 1.995 0.0
 2.005 5.0

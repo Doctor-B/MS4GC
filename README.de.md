@@ -1,51 +1,40 @@
 # MS4GC – MakeSignal4GoConfigure
 
-**MS4GC** ist ein kleines Kommandozeilenprogramm zum Erzeugen von Zeit-/Spannungs-Wertepaaren für benutzerdefinierte Signaldefinitionen.
+**MS4GC** ist ein kleines Python-Kommandozeilenwerkzeug zur Erzeugung von Zeit-/Spannungs-Wertepaaren für benutzerdefinierte Signale.
 
-Das Programm kann aus einer Bitfolge wie `0011010` eine Signaldatei erzeugen oder mit `-clock` ein periodisches Low-/High-Taktsignal erzeugen. Die Zeiten werden in Millisekunden ausgegeben, die Spannungen in Volt.
+Das Programm kann aus Bitfolgen wie `0011010` eine Signaldatei erzeugen oder mit `-clock` ein periodisches Low-/High-Taktsignal mit konfigurierbaren Anstiegs- und Abfallzeiten erzeugen. Zeiten werden in Millisekunden ausgegeben, Spannungen in Volt.
 
-Die erzeugten `.dat`-Dateien enthalten standardmäßig einen Parameter-Header, damit die Erzeugungsparameter und Kommandozeilenargumente nachvollziehbar bleiben. Mit `-noheader` werden reine Wertepaare für Import-Workflows in Signalgenerator- oder Bauteilkonfigurationssoftware erzeugt. Der primäre Anwendungsfall ist **Renesas Go Configure™ Software Hub**, zum Beispiel zur Konfiguration einer Spannungsquelle über einen Custom-Signal-Import wie **Custom Signal** / **Import Points** im **Custom Signal Wizard**. Die exakten Bezeichnungen in der Oberfläche können je nach Go-Configure-Version und ausgewählter Bauteilfamilie abweichen.
+Die erzeugten `.dat`-Dateien können entweder mit einem nachvollziehbaren Parameter-Header oder mit `-noheader` als reine Wertepaare geschrieben werden. Die reine Wertepaarausgabe ist für den direkten Import in Signaldefinitions-Werkzeuge gedacht. Der primäre Anwendungsfall ist Renesas Go Configure™ Software Hub, zum Beispiel zur Konfiguration einer Spannungsquelle über einen Custom-Signal-Import wie „Custom Signal“ / „Import Points“, abhängig von der installierten Go-Configure-Version und der ausgewählten Bauteilfamilie.
 
-MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, eigene Rise- und Fall-Zeiten, Defaultwerte in `MS4GCdefault.json` und Flankenpositionen, bei denen der ideale Umschaltzeitpunkt am Anfang, in der Mitte oder am Ende der Flanke liegen kann.
+MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, individuelle Rise- und Fall-Zeiten, Defaultwerte in `MS4GCdefault.json`, Flankenpositionen, Sprachauswahl und Phasenverschiebung.
 
 Die englische Hauptdokumentation steht in [`README.md`](README.md).
 
 ## Funktionen
 
-- Erzeugung von Zeit-/Spannungs-Wertepaaren aus einer Bitfolge.
-- Erzeugung periodischer Low-/High-Taktsignale mit `-clock`.
-- Konfigurierbare `high`- und `low`-Spannungspegel, auch negativ.
-- Gemeinsame Rampenzeit oder getrennte Rise-/Fall-Zeiten.
-- Flankenposition mit `-edgepos start|center|end`.
-- Speichern von Defaults in `MS4GCdefault.json`.
-- Englisch als Standardsprache, Deutsch über `-language de` oder die Defaultdatei.
-- Direkte Ausgabe in `.dat`-Dateien.
-- Unterdrücken des standardmäßigen Parameter-Headers mit `-noheader` für direkte Importdateien.
-- Aufnahme der verwendeten Kommandozeilenargumente in den Standard-Header zur Nachvollziehbarkeit.
+- Erzeugung von Wertepaaren aus Bitfolgen, z. B. `0011010`
+- Erzeugung von Taktsignalen mit `-clock LOW_TIME HIGH_TIME CLOCKS`
+- Konfiguration von `timebase`, `interval`, `ramp`, `rise`, `fall`, `high` und `low`
+- Zeitliche Verschiebung des Signals mit `-phase`
+- Wahl der Flankenposition mit `-edgepos start|center|end`
+- Speicherung von Defaultwerten in `MS4GCdefault.json`
+- Englisch als Standardsprache, Deutsch mit `-language de`
+- Ausgabe mit Header oder reine Import-Wertepaare mit `-noheader`
 
 ## Voraussetzungen
 
-- Empfohlen: Python 3.10 oder neuer.
-- Es werden keine externen Python-Pakete benötigt.
+- Python 3.10 oder neuer wird empfohlen
+- Es werden keine externen Python-Pakete benötigt
 
 ## Schnellstart
 
 ```bash
-python MS4GC.py 0011010
+python MS4GC.py -noheader 0011010
 ```
 
-Ausgabe:
+Beispielausgabe:
 
 ```text
-MS4GC Version 1.04
-command = MS4GC 0011010
-language = en
-timebase: 1.0 [ms]
-edgepos = center
-interval = 20.0 [ms]
-ramp = 1%
-high = 5.0 [V]
-low = 0.0 [V]
 0.0 0.0
 1.995 0.0
 2.005 5.0
@@ -58,45 +47,35 @@ low = 0.0 [V]
 20.0 0.0
 ```
 
-Standardwerte:
+Die Defaultwerte sind:
 
 ```text
 language = en
-timebase = 1 ms
-interval = 20 ms
-ramp = 1% von timebase = 0.01 ms
+timebase = 1.0 ms
+interval = 20.0 ms
+phase = 0.0 ms
 edgepos = center
-high = 5 V
-low = 0 V
+ramp = 1%
+high = 5.0 V
+low = 0.0 V
 ```
 
-## Ausgabe in Datei speichern
+## Ausgabe mit und ohne Header
+
+Standardmäßig schreibt MS4GC einen Parameter-Header. Der Header enthält die verwendete Kommandozeile, damit die Datei später nachvollziehbar bleibt.
 
 ```bash
 python MS4GC.py -file Signal 0011010
 ```
 
-Das schreibt `Signal.dat`. Wenn die Datei bereits existiert, zeigt MS4GC die Erzeugungsparameter an und fragt vor dem Überschreiben nach.
-
-Die Endung `.dat` wird automatisch ergänzt, falls sie fehlt.
-
-## Header und Importmodus
-
-Standardmäßig schreibt MS4GC einen Parameter-Header vor die erzeugten Wertepaare. Der Header enthält auch die verwendeten Kommandozeilenargumente, damit die Datei später leichter reproduziert werden kann.
-
-Mit `-noheader` wird eine reine Punktliste erzeugt, falls ein Zielwerkzeug nur Wertepaare erwartet:
-
-```bash
-python MS4GC.py -noheader -file Signal 0011010
-```
-
-Beispiel für den Standard-Header:
+Beispiel-Header:
 
 ```text
-MS4GC Version 1.04
+MS4GC Version 1.05
 command = MS4GC -file Signal 0011010
 language = en
-timebase: 1.0 [ms]
+timebase = 1.0 [ms]
+phase = 0.0 [ms]
 edgepos = center
 interval = 20.0 [ms]
 ramp = 1%
@@ -104,13 +83,43 @@ high = 5.0 [V]
 low = 0.0 [V]
 ```
 
-## Taktsignal mit `-clock`
+Für Import-Workflows, die reine Wertepaare benötigen, verwende `-noheader`:
 
 ```bash
-python MS4GC.py -clock 0.48 0.51 2
+python MS4GC.py -noheader -file Signal 0011010
 ```
 
-Mit `ramp = 0.01 ms` und `edgepos=center` entsteht:
+Fehlt die Endung `.dat`, wird sie automatisch ergänzt.
+
+## Bitfolgenmodus
+
+Das Positionsargument ist eine Bitfolge:
+
+```bash
+python MS4GC.py 0011010
+```
+
+Jedes Bit belegt eine `timebase`. Ein Wechsel von `0` nach `1` erzeugt eine steigende Flanke, ein Wechsel von `1` nach `0` eine fallende Flanke.
+
+```bash
+python MS4GC.py -timebase 2ms -ramp 0.05ms -high 3.3 -low 0 0011010
+```
+
+## Taktsignalmodus
+
+Der Taktsignalmodus nutzt drei Argumente:
+
+```bash
+python MS4GC.py -clock LOW_TIME HIGH_TIME CLOCKS
+```
+
+Beispiel:
+
+```bash
+python MS4GC.py -noheader -clock 0.48 0.51 2
+```
+
+Mit dem Default `edgepos=center` beginnt die Ausgabe so:
 
 ```text
 0.0 0.0
@@ -124,128 +133,130 @@ Mit `ramp = 0.01 ms` und `edgepos=center` entsteht:
 1.985 0.0
 ```
 
-`LOW_TIME` und `HIGH_TIME` werden als Millisekunden interpretiert, wenn keine Einheit angegeben ist. `CLOCKS` ist die Anzahl der Low-/High-Zyklen.
+Im Taktsignalmodus wird `interval` nicht verwendet. Das sichtbare Ausgabefenster ergibt sich aus dem erzeugten Taktsignal selbst.
 
 ## Flankenposition
 
-`-edgepos` legt fest, wie der ideale Umschaltzeitpunkt relativ zur Rampe interpretiert wird.
-
-| Wert | Bedeutung |
-|---|---|
-| `start` | Die Flanke beginnt beim idealen Umschaltzeitpunkt. |
-| `center` | Die Flankenmitte liegt beim idealen Umschaltzeitpunkt. Das ist der Default. |
-| `end` | Die Flanke ist beim idealen Umschaltzeitpunkt abgeschlossen. |
-
-Beispiel für eine steigende Flanke bei `t = 0.48 ms` und `ramp = 0.01 ms`:
-
-| Modus | Erzeugte Flankenpunkte |
-|---|---|
-| `start` | `0.48 0.0` → `0.49 5.0` |
-| `center` | `0.475 0.0` → `0.485 5.0` |
-| `end` | `0.47 0.0` → `0.48 5.0` |
-
-## Zeitangaben
-
-Alle Ausgabezeiten sind in Millisekunden. Eingaben können Einheiten verwenden:
+`-edgepos` legt fest, wie der ideale Umschaltzeitpunkt zur linearen Flanke liegt:
 
 ```text
-ns, us, µs, ms, s
+start   die Flanke beginnt beim Umschaltzeitpunkt
+center  die Flankenmitte liegt beim Umschaltzeitpunkt
+end     die Flanke ist beim Umschaltzeitpunkt abgeschlossen
 ```
 
-Beispiele:
+Default:
+
+```text
+-edgepos center
+```
+
+Für eine steigende Flanke mit `rise = 0.01ms` beim Umschaltzeitpunkt `t = 2.0ms`:
+
+```text
+start:   2.000ms -> 2.010ms
+center:  1.995ms -> 2.005ms
+end:     1.990ms -> 2.000ms
+```
+
+## Phase
+
+`-phase` verschiebt das gesamte erzeugte Signal zeitlich.
+
+```text
+positive phase  -> Signal kommt später
+negative phase  -> Signal kommt früher
+```
+
+Beispiel:
 
 ```bash
-python MS4GC.py -timebase 2ms 0011010
-python MS4GC.py -rise 10us -fall 20us 0011010
-python MS4GC.py -clock 480us 510us 20
+python MS4GC.py -noheader -timebase 1ms -phase -2ms 0010100
 ```
 
-Ohne Einheit wird Millisekunden angenommen.
+Die Ausgabe beginnt immer bei `t = 0`. Punkte außerhalb des sichtbaren Zeitfensters werden abgeschnitten. Ist eine lineare Flanke am Anfang oder Ende des Fensters nur teilweise sichtbar, interpoliert MS4GC die Spannung an der Schnittgrenze.
+
+Das bedeutet: Mit `edgepos=center` kann eine genau bei `t = 0` zentrierte Flanke einen interpolierten Startwert wie `2.5V` bei einem Übergang von `0V` nach `5V` erzeugen.
+
+## Rise, Fall und Ramp
+
+`-ramp` setzt Rise und Fall gemeinsam:
+
+```bash
+python MS4GC.py -ramp 1% 0011010
+python MS4GC.py -ramp 0.01ms 0011010
+```
+
+`-rise` und `-fall` können unabhängig gesetzt werden:
+
+```bash
+python MS4GC.py -rise 10us -fall 50us 0011010
+```
+
+Sind Rise und Fall gleich, wird nur `ramp` in `MS4GCdefault.json` gespeichert. Sind Rise und Fall verschieden, werden nur `rise_ms` und `fall_ms` gespeichert.
 
 ## Spannungspegel
 
-Defaultwerte:
-
-```text
-high = 5 V
-low = 0 V
-```
-
-Beide Pegel setzen:
+Defaultwerte sind `5V` für High und `0V` für Low.
 
 ```bash
-python MS4GC.py -signal 3.3 0 0011010
+python MS4GC.py -high 3.3 -low 0 0011010
+python MS4GC.py -signal 2.5 -2.5 0011010
 ```
 
-Nur einen Pegel setzen:
+## Defaultwerte
+
+MS4GC liest `MS4GCdefault.json` bei jedem Start aus dem aktuellen Arbeitsverzeichnis.
+
+Defaultwerte anzeigen:
 
 ```bash
-python MS4GC.py -high 2.5 0011010
-python MS4GC.py -low -1.0 0011010
+python MS4GC.py -show
 ```
 
-Negative Spannungen sind erlaubt.
-
-## Defaultdatei
-
-Bei jedem Aufruf prüft MS4GC zuerst, ob `MS4GCdefault.json` im aktuellen Arbeitsverzeichnis existiert. Falls ja, wird sie geladen und verwendet.
-
-Aktuelle Einstellungen speichern:
+Aktuelle Werte speichern:
 
 ```bash
-python MS4GC.py -language de -edgepos center -ramp 1% -high 5 -low 0 -save
+python MS4GC.py -language de -timebase 2ms -phase -0.5ms -edgepos center -ramp 2% -save
 ```
 
 Beispiel:
 
 ```json
 {
-    "version": "1.04",
+    "version": "1.05",
     "language": "de",
-    "timebase_ms": 1.0,
+    "timebase_ms": 2.0,
     "interval_ms": 20.0,
+    "phase_ms": -0.5,
     "edgepos": "center",
     "high_v": 5.0,
     "low_v": 0.0,
-    "ramp": "1%"
+    "ramp": "2%"
 }
 ```
 
-Wenn `language` fehlt, wird Englisch verwendet. Aktuell unterstützt:
+Fehlt `language`, wird Englisch verwendet.
 
-```text
-en
-de
-```
-
-Wenn Rise und Fall gleich sind, wird nur `ramp` gespeichert. Wenn sie verschieden sind, werden nur `rise_ms` und `fall_ms` gespeichert.
-
-## Defaults anzeigen
+## Hilfe und Version
 
 ```bash
-python MS4GC.py -show
-```
-
-## Deutsche Ausgabe und Hilfe
-
-Deutsch temporär verwenden:
-
-```bash
-python MS4GC.py -language de -show
+python MS4GC.py -help
+python MS4GC.py -version
 python MS4GC.py -language de -help
-```
-
-Deutsch als Standardsprache speichern:
-
-```bash
-python MS4GC.py -language de -save
 ```
 
 ## Tests
 
+Tests aus dem Hauptverzeichnis ausführen:
+
 ```bash
 python -m unittest discover -s tests
 ```
+
+## Hinweis zur Erstellung
+
+Dieses Projekt wurde von Andreas Beck mit Unterstützung von OpenAI ChatGPT entwickelt. Der erzeugte Code, die Dokumentation und die Beispiele wurden vor der Veröffentlichung vom Repository-Inhaber geprüft und angepasst.
 
 ## Lizenz
 
