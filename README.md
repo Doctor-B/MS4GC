@@ -6,7 +6,7 @@ It can create signals from binary sequences such as `0011010` or generate period
 
 The generated `.dat` files can be written either with a traceable parameter header or as plain point pairs using `-noheader`. Plain point-pair output is intended for direct import into signal-definition tools. The primary target use case is Renesas Go Configure™ Software Hub, for example when configuring a voltage source with a custom-signal import workflow such as “Custom Signal” / “Import Points”, depending on the installed Go Configure version and the selected device family.
 
-MS4GC supports configurable high and low voltage levels, negative voltages, custom rise and fall times, default settings stored in `MS4GCdefault.json`, edge positioning modes, language selection, and phase shifting.
+MS4GC supports configurable high and low voltage levels, negative voltages, custom rise and fall times, logical signal inversion, default settings stored in `MS4GCdefault.json`, edge positioning modes, language selection, and phase shifting.
 
 German documentation is available in [`README.de.md`](README.de.md).
 
@@ -16,6 +16,7 @@ German documentation is available in [`README.de.md`](README.de.md).
 - Generate clock signals with `-clock LOW_TIME HIGH_TIME CLOCKS`
 - Configure `timebase`, `interval`, `ramp`, `rise`, `fall`, `high`, and `low`
 - Shift the generated signal with `-phase`
+- Invert logical high/low states with `-invert`
 - Select edge alignment with `-edgepos start|center|end`
 - Store defaults in `MS4GCdefault.json`
 - English default language, optional German output with `-language de`
@@ -54,6 +55,7 @@ language = en
 timebase = 1.0 ms
 interval = 20.0 ms
 phase = 0.0 ms
+invert = false
 edgepos = center
 ramp = 1%
 high = 5.0 V
@@ -71,11 +73,12 @@ python MS4GC.py -file Signal 0011010
 Example header:
 
 ```text
-MS4GC Version 1.05
+MS4GC Version 1.06
 command = MS4GC -file Signal 0011010
 language = en
 timebase = 1.0 [ms]
 phase = 0.0 [ms]
+invert = false
 edgepos = center
 interval = 20.0 [ms]
 ramp = 1%
@@ -178,6 +181,30 @@ The output always starts at `t = 0`. Points outside the visible time window are 
 
 This means that with `edgepos=center`, a transition centered exactly at `t = 0` can produce an interpolated start value such as `2.5V` for a `0V` to `5V` transition.
 
+## Signal inversion
+
+`-invert` exchanges the logical high and low states before transitions are generated. The timing, phase, and switching instants remain unchanged.
+
+```bash
+python MS4GC.py -noheader -invert 0010100
+```
+
+The bit sequence is therefore treated as its logical inverse:
+
+```text
+0010100 -> 1101011
+```
+
+Inversion is performed before applying `rise` and `fall`. Therefore, a transition that becomes physically falling after inversion uses the configured falling time, and a transition that becomes physically rising uses the configured rising time.
+
+In clock mode, the time structure is preserved: the signal starts high, changes to low after `LOW_TIME`, and changes back to high after `HIGH_TIME`. A different interpretation of clock phase lengths can be added later as a separate option.
+
+The inversion state can be stored in `MS4GCdefault.json`. Use `-noinvert` to explicitly disable a stored inversion:
+
+```bash
+python MS4GC.py -noinvert -save
+```
+
 ## Rise, fall, and ramp
 
 `-ramp` sets both rise and fall time:
@@ -217,18 +244,19 @@ python MS4GC.py -show
 Save current values as defaults:
 
 ```bash
-python MS4GC.py -language de -timebase 2ms -phase -0.5ms -edgepos center -ramp 2% -save
+python MS4GC.py -language de -timebase 2ms -phase -0.5ms -invert -edgepos center -ramp 2% -save
 ```
 
 Example default file:
 
 ```json
 {
-    "version": "1.05",
+    "version": "1.06",
     "language": "de",
     "timebase_ms": 2.0,
     "interval_ms": 20.0,
     "phase_ms": -0.5,
+    "invert": true,
     "edgepos": "center",
     "high_v": 5.0,
     "low_v": 0.0,
@@ -236,7 +264,7 @@ Example default file:
 }
 ```
 
-If `language` is missing, English is used.
+If `language` is missing, English is used. If `invert` is missing, inversion is disabled.
 
 ## Help and version
 

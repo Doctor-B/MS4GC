@@ -103,13 +103,14 @@ class TestMS4GC(unittest.TestCase):
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
-                exit_code = MS4GC.main(["-language", "de", "-phase", "-0.5ms", "-save"])
+                with redirect_stdout(io.StringIO()):
+                    exit_code = MS4GC.main(["-language", "de", "-phase", "-0.5ms", "-save"])
                 self.assertEqual(exit_code, 0)
                 with open("MS4GCdefault.json", "r", encoding="utf-8") as handle:
                     data = json.load(handle)
                 self.assertEqual(data["language"], "de")
                 self.assertAlmostEqual(data["phase_ms"], -0.5)
-                self.assertEqual(data["version"], "1.05")
+                self.assertEqual(data["version"], "1.06")
             finally:
                 os.chdir(old_cwd)
 
@@ -127,6 +128,81 @@ class TestMS4GC(unittest.TestCase):
                 self.assertTrue(output.startswith("0.0 0.0"))
             finally:
                 os.chdir(old_cwd)
+
+    def test_invert_bit_signal_uses_fall_for_inverted_falling_edge(self):
+        pairs = MS4GC.generate_bit_signal_pairs(
+            bitsignal="01",
+            timebase_ms=1.0,
+            interval_ms=2.0,
+            rise_ms=0.01,
+            fall_ms=0.04,
+            edgepos="center",
+            high_v=5.0,
+            low_v=0.0,
+            invert=True,
+            language="en",
+            phase_ms=0.0,
+        )
+        self.assertEqual(pairs[0], (0.0, 5.0))
+        self.assertIn((0.98, 5.0), pairs)
+        self.assertIn((1.02, 0.0), pairs)
+        self.assertEqual(pairs[-1], (2.0, 0.0))
+
+    def test_invert_clock_preserves_time_structure_and_swaps_states(self):
+        pairs = MS4GC.generate_clock_signal_pairs(
+            low_time_ms=0.48,
+            high_time_ms=0.51,
+            clocks=1,
+            rise_ms=0.02,
+            fall_ms=0.04,
+            edgepos="center",
+            high_v=5.0,
+            low_v=0.0,
+            invert=True,
+            language="en",
+            phase_ms=0.0,
+        )
+        expected = [
+            (0.0, 5.0),
+            (0.46, 5.0),
+            (0.5, 0.0),
+            (0.98, 0.0),
+            (1.0, 5.0),
+        ]
+        self.assertEqual(len(pairs), len(expected))
+        for actual, wanted in zip(pairs, expected):
+            self.assertAlmostEqual(actual[0], wanted[0])
+            self.assertAlmostEqual(actual[1], wanted[1])
+
+    def test_invert_can_be_saved_and_disabled(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(MS4GC.main(["-invert", "-save"]), 0)
+                with open("MS4GCdefault.json", "r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                self.assertTrue(data["invert"])
+
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(MS4GC.main(["-noinvert", "-save"]), 0)
+                with open("MS4GCdefault.json", "r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                self.assertFalse(data["invert"])
+            finally:
+                os.chdir(old_cwd)
+
+    def test_help_and_version_are_accepted(self):
+        with redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as help_exit:
+                MS4GC.main(["-help"])
+        self.assertEqual(help_exit.exception.code, 0)
+
+        with redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as version_exit:
+                MS4GC.main(["-version"])
+        self.assertEqual(version_exit.exception.code, 0)
 
 
 if __name__ == "__main__":

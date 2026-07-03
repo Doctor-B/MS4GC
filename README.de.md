@@ -6,7 +6,7 @@ Das Programm kann aus Bitfolgen wie `0011010` eine Signaldatei erzeugen oder mit
 
 Die erzeugten `.dat`-Dateien können entweder mit einem nachvollziehbaren Parameter-Header oder mit `-noheader` als reine Wertepaare geschrieben werden. Die reine Wertepaarausgabe ist für den direkten Import in Signaldefinitions-Werkzeuge gedacht. Der primäre Anwendungsfall ist Renesas Go Configure™ Software Hub, zum Beispiel zur Konfiguration einer Spannungsquelle über einen Custom-Signal-Import wie „Custom Signal“ / „Import Points“, abhängig von der installierten Go-Configure-Version und der ausgewählten Bauteilfamilie.
 
-MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, individuelle Rise- und Fall-Zeiten, Defaultwerte in `MS4GCdefault.json`, Flankenpositionen, Sprachauswahl und Phasenverschiebung.
+MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, individuelle Rise- und Fall-Zeiten, logische Signalinvertierung, Defaultwerte in `MS4GCdefault.json`, Flankenpositionen, Sprachauswahl und Phasenverschiebung.
 
 Die englische Hauptdokumentation steht in [`README.md`](README.md).
 
@@ -16,6 +16,7 @@ Die englische Hauptdokumentation steht in [`README.md`](README.md).
 - Erzeugung von Taktsignalen mit `-clock LOW_TIME HIGH_TIME CLOCKS`
 - Konfiguration von `timebase`, `interval`, `ramp`, `rise`, `fall`, `high` und `low`
 - Zeitliche Verschiebung des Signals mit `-phase`
+- Invertierung der logischen High-/Low-Zustände mit `-invert`
 - Wahl der Flankenposition mit `-edgepos start|center|end`
 - Speicherung von Defaultwerten in `MS4GCdefault.json`
 - Englisch als Standardsprache, Deutsch mit `-language de`
@@ -54,6 +55,7 @@ language = en
 timebase = 1.0 ms
 interval = 20.0 ms
 phase = 0.0 ms
+invert = false
 edgepos = center
 ramp = 1%
 high = 5.0 V
@@ -71,11 +73,12 @@ python MS4GC.py -file Signal 0011010
 Beispiel-Header:
 
 ```text
-MS4GC Version 1.05
+MS4GC Version 1.06
 command = MS4GC -file Signal 0011010
 language = en
 timebase = 1.0 [ms]
 phase = 0.0 [ms]
+invert = false
 edgepos = center
 interval = 20.0 [ms]
 ramp = 1%
@@ -178,6 +181,30 @@ Die Ausgabe beginnt immer bei `t = 0`. Punkte außerhalb des sichtbaren Zeitfens
 
 Das bedeutet: Mit `edgepos=center` kann eine genau bei `t = 0` zentrierte Flanke einen interpolierten Startwert wie `2.5V` bei einem Übergang von `0V` nach `5V` erzeugen.
 
+## Signalinvertierung
+
+`-invert` vertauscht die logischen High- und Low-Zustände, bevor die Flanken erzeugt werden. Zeitlicher Verlauf, Phase und Umschaltzeitpunkte bleiben unverändert.
+
+```bash
+python MS4GC.py -noheader -invert 0010100
+```
+
+Die Bitfolge wird damit wie ihr logisches Gegenstück behandelt:
+
+```text
+0010100 -> 1101011
+```
+
+Die Invertierung erfolgt vor der Anwendung von `rise` und `fall`. Wird eine Flanke durch die Invertierung physikalisch fallend, verwendet sie daher die konfigurierte Fall-Zeit. Eine physikalisch steigende Flanke verwendet die Rise-Zeit.
+
+Im Clock-Modus bleibt die Zeitstruktur erhalten: Das Signal beginnt High, wechselt nach `LOW_TIME` zu Low und nach `HIGH_TIME` wieder zu High. Eine andere Interpretation der Clock-Zeitabschnitte kann später über eine getrennte Option ergänzt werden.
+
+Der Invertierungszustand kann in `MS4GCdefault.json` gespeichert werden. Mit `-noinvert` lässt sich eine gespeicherte Invertierung ausdrücklich deaktivieren:
+
+```bash
+python MS4GC.py -noinvert -save
+```
+
 ## Rise, Fall und Ramp
 
 `-ramp` setzt Rise und Fall gemeinsam:
@@ -217,18 +244,19 @@ python MS4GC.py -show
 Aktuelle Werte speichern:
 
 ```bash
-python MS4GC.py -language de -timebase 2ms -phase -0.5ms -edgepos center -ramp 2% -save
+python MS4GC.py -language de -timebase 2ms -phase -0.5ms -invert -edgepos center -ramp 2% -save
 ```
 
 Beispiel:
 
 ```json
 {
-    "version": "1.05",
+    "version": "1.06",
     "language": "de",
     "timebase_ms": 2.0,
     "interval_ms": 20.0,
     "phase_ms": -0.5,
+    "invert": true,
     "edgepos": "center",
     "high_v": 5.0,
     "low_v": 0.0,
@@ -236,7 +264,7 @@ Beispiel:
 }
 ```
 
-Fehlt `language`, wird Englisch verwendet.
+Fehlt `language`, wird Englisch verwendet. Fehlt `invert`, ist die Invertierung deaktiviert.
 
 ## Hilfe und Version
 

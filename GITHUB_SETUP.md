@@ -17,7 +17,7 @@ Open PowerShell in the local `MS4GC` folder:
 ```powershell
 git init
 git add .
-git commit -m "Initial commit: add MS4GC 1.05"
+git commit -m "Initial commit: add MS4GC 1.06"
 git branch -M main
 ```
 
@@ -74,3 +74,21 @@ Before publishing a new version, it is recommended to run the tests:
 ```powershell
 python -m unittest discover -s tests
 ```
+
+## 6. Update an existing MS4GC repository to 1.06
+
+Copy the contents of this package into the existing local `MS4GC` repository. Keep the existing hidden `.git` directory.
+
+Then run:
+
+```powershell
+python .\MS4GC.py -version
+python -m unittest discover -s tests -v
+git status
+git diff
+git add .
+git commit -m "Release MS4GC 1.06"
+git push
+```
+
+The version command should report `MS4GC Version 1.06`, and the tests should end with `OK` before committing.

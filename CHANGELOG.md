@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.06
+
+- Added `-invert` to exchange logical high and low signal states.
+- Inversion is applied before transition generation, so configured `rise` and `fall` times follow the physical edge direction.
+- Clock inversion preserves the existing time structure while exchanging logical states.
+- Added `-noinvert` to disable an inversion stored in `MS4GCdefault.json`.
+- Added `invert` to saved defaults and traceable output headers.
+- Added inversion examples and automated tests.
+
 ## 1.05
 
 - Added `-phase` to shift the complete generated signal in time.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MS4GC - MakeSignal4GoConfigure
-Version 1.05
+Version 1.06
 
 Generate time/voltage point pairs for custom signal definitions.
 """
@@ -16,12 +16,12 @@ import re
 import shlex
 import sys
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, Sequence
 
 
 PROGRAM_NAME = "MS4GC"
 PROGRAM_LONG_NAME = "MakeSignal4GoConfigure"
-VERSION = "1.05"
+VERSION = "1.06"
 DEFAULT_FILE = "MS4GCdefault.json"
 VALID_LANGUAGES = ("en", "de")
 VALID_EDGEPOS = ("start", "center", "end")
@@ -32,6 +32,7 @@ BUILTIN_DEFAULTS = {
     "timebase_ms": 1.0,
     "interval_ms": 20.0,
     "phase_ms": 0.0,
+    "invert": False,
     "ramp": "1%",
     "edgepos": "center",
     "high_v": 5.0,
@@ -46,6 +47,8 @@ TEXT = {
         "timebase_help": "timebase for bit signals and percentage ramps, default 1ms. Examples: 1ms, 10us, 0.5s",
         "interval_help": "output interval for bit signals, default 20ms",
         "phase_help": "shift the whole signal in time. Positive values delay the signal, negative values advance it. Examples: -2ms, 0.5ms",
+        "invert_help": "invert the logical signal states before transition generation. Timing remains unchanged; high and low states are exchanged.",
+        "noinvert_help": "disable signal inversion, including an inversion stored in MS4GCdefault.json",
         "clock_help": "generate a low/high clock signal. LOW_TIME and HIGH_TIME are times; CLOCKS is the number of low-high cycles. Example: -clock 0.48 0.51 20",
         "edgepos_help": "position of the ideal switching time relative to the transition: start, center, or end. Default: center",
         "ramp_help": "rise/fall ramp, default 1%% of timebase. Examples: 1%%, 0.01ms, 10us",
@@ -78,6 +81,8 @@ TEXT = {
         "clock_integer": "CLOCKS must be an integer.",
         "rise_low_too_large": "rise must not be greater than low-time.",
         "fall_high_too_large": "fall must not be greater than high-time.",
+        "fall_low_too_large": "fall must not be greater than low-time when the clock is inverted.",
+        "rise_high_too_large": "rise must not be greater than high-time when the clock is inverted.",
         "file_exists": "File already exists: {file}",
         "would_generate": "The file would be generated with these parameters:",
         "overwrite": "Overwrite file? [y/N]: ",
@@ -92,6 +97,8 @@ TEXT = {
         "timebase_help": "Zeitbasis für Bitfolgen und Prozent-Rampen, default 1ms. Beispiele: 1ms, 10us, 0.5s",
         "interval_help": "Ausgabeintervall für Bitfolgen, default 20ms",
         "phase_help": "verschiebt das gesamte Signal zeitlich. Positive Werte verzögern, negative Werte ziehen vor. Beispiele: -2ms, 0.5ms",
+        "invert_help": "invertiert die logischen Signalzustände vor der Flankenerzeugung. Der zeitliche Verlauf bleibt unverändert; High und Low werden vertauscht.",
+        "noinvert_help": "deaktiviert die Signalinvertierung, auch wenn sie in MS4GCdefault.json gespeichert ist",
         "clock_help": "erzeugt ein Low-/High-Taktsignal. LOW_TIME und HIGH_TIME sind Zeiten; CLOCKS ist die Anzahl der Low-High-Zyklen. Beispiel: -clock 0.48 0.51 20",
         "edgepos_help": "Position des idealen Umschaltzeitpunkts relativ zur Flanke: start, center oder end. Default: center",
         "ramp_help": "Rise/Fall-Rampe, default 1%% von timebase. Beispiele: 1%%, 0.01ms, 10us",
@@ -124,6 +131,8 @@ TEXT = {
         "clock_integer": "CLOCKS muss eine ganze Zahl sein.",
         "rise_low_too_large": "rise darf nicht größer als low-time sein.",
         "fall_high_too_large": "fall darf nicht größer als high-time sein.",
+        "fall_low_too_large": "fall darf bei invertiertem Takt nicht größer als low-time sein.",
+        "rise_high_too_large": "rise darf bei invertiertem Takt nicht größer als high-time sein.",
         "file_exists": "Datei existiert bereits: {file}",
         "would_generate": "Die Datei würde mit folgenden Parametern erzeugt:",
         "overwrite": "Datei überschreiben? [j/N]: ",
@@ -144,6 +153,14 @@ def normalize_language(value: object) -> str:
     if lang in VALID_LANGUAGES:
         return lang
     return "en"
+
+
+def normalize_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "ja"}
+    return bool(value)
 
 
 def parse_time_to_ms(value: str) -> float:
@@ -189,6 +206,9 @@ def normalize_defaults(data: dict) -> dict:
     for key in ("timebase_ms", "interval_ms", "phase_ms", "high_v", "low_v"):
         if key in data:
             defaults[key] = data[key]
+
+    if "invert" in data:
+        defaults["invert"] = normalize_bool(data["invert"])
 
     if "language" in data:
         defaults["language"] = normalize_language(data["language"])
@@ -307,9 +327,12 @@ def generate_raw_bit_signal_pairs(
     edgepos: str,
     high_v: float,
     low_v: float,
+    invert: bool = False,
     language: str = "en",
 ) -> list[tuple[float, float]]:
     validate_bitsignal(bitsignal, language)
+    if invert:
+        bitsignal = "".join("1" if bit == "0" else "0" for bit in bitsignal)
     check_common_signal_values(timebase_ms, rise_ms, fall_ms, language)
     if interval_ms <= 0:
         raise ValueError(tr(language, "interval_positive"))
@@ -332,7 +355,7 @@ def generate_raw_bit_signal_pairs(
         current_level = level(current_bit)
         if current_bit != previous_bit:
             clock_time = index * timebase_ms
-            ramp_time = rise_ms if current_level > previous_level else fall_ms
+            ramp_time = rise_ms if current_bit == "1" else fall_ms
             start_time, end_time = edge_times(clock_time, ramp_time, edgepos)
             pairs.append((start_time, previous_level))
             pairs.append((end_time, current_level))
@@ -352,6 +375,7 @@ def generate_raw_clock_signal_pairs(
     edgepos: str,
     high_v: float,
     low_v: float,
+    invert: bool = False,
     language: str = "en",
 ) -> list[tuple[float, float]]:
     if low_time_ms <= 0:
@@ -362,25 +386,36 @@ def generate_raw_clock_signal_pairs(
         raise ValueError(tr(language, "clocks_positive"))
     if rise_ms < 0 or fall_ms < 0:
         raise ValueError(tr(language, "rise_fall_nonnegative"))
-    if rise_ms > low_time_ms:
-        raise ValueError(tr(language, "rise_low_too_large"))
-    if fall_ms > high_time_ms:
-        raise ValueError(tr(language, "fall_high_too_large"))
+    if invert:
+        if fall_ms > low_time_ms:
+            raise ValueError(tr(language, "fall_low_too_large"))
+        if rise_ms > high_time_ms:
+            raise ValueError(tr(language, "rise_high_too_large"))
+    else:
+        if rise_ms > low_time_ms:
+            raise ValueError(tr(language, "rise_low_too_large"))
+        if fall_ms > high_time_ms:
+            raise ValueError(tr(language, "fall_high_too_large"))
     if edgepos not in VALID_EDGEPOS:
         raise ValueError(f"edgepos must be one of: {', '.join(VALID_EDGEPOS)}")
 
-    pairs: list[tuple[float, float]] = [(0.0, low_v)]
+    initial_level = high_v if invert else low_v
+    second_level = low_v if invert else high_v
+    first_ramp_ms = fall_ms if invert else rise_ms
+    second_ramp_ms = rise_ms if invert else fall_ms
+
+    pairs: list[tuple[float, float]] = [(0.0, initial_level)]
     clock_time = 0.0
     for _ in range(clocks):
         clock_time += low_time_ms
-        start_time, end_time = edge_times(clock_time, rise_ms, edgepos)
-        pairs.append((start_time, low_v))
-        pairs.append((end_time, high_v))
+        start_time, end_time = edge_times(clock_time, first_ramp_ms, edgepos)
+        pairs.append((start_time, initial_level))
+        pairs.append((end_time, second_level))
 
         clock_time += high_time_ms
-        start_time, end_time = edge_times(clock_time, fall_ms, edgepos)
-        pairs.append((start_time, high_v))
-        pairs.append((end_time, low_v))
+        start_time, end_time = edge_times(clock_time, second_ramp_ms, edgepos)
+        pairs.append((start_time, second_level))
+        pairs.append((end_time, initial_level))
 
     return pairs
 
@@ -504,6 +539,7 @@ def build_header(config: dict, mode: str) -> list[str]:
         f"language = {config['language']}",
         f"timebase = {format_number(config['timebase_ms'])} [ms]",
         f"phase = {format_number(config['phase_ms'])} [ms]",
+        f"invert = {str(config['invert']).lower()}",
         f"edgepos = {config['edgepos']}",
     ]
     if mode == "bitsignal":
@@ -559,6 +595,7 @@ def save_defaults(config: dict, language: str) -> None:
         "timebase_ms": config["timebase_ms"],
         "interval_ms": config["interval_ms"],
         "phase_ms": config["phase_ms"],
+        "invert": config["invert"],
         "edgepos": config["edgepos"],
         "high_v": config["high_v"],
         "low_v": config["low_v"],
@@ -584,6 +621,7 @@ def show_defaults(defaults: dict, language: str) -> None:
     print(f"timebase = {format_number(float(defaults['timebase_ms']))} ms")
     print(f"interval = {format_number(float(defaults['interval_ms']))} ms")
     print(f"phase = {format_number(float(defaults['phase_ms']))} ms")
+    print(f"invert = {str(bool(defaults['invert'])).lower()}")
     print(f"edgepos = {defaults['edgepos']}")
     if ramp_mode_from_defaults(defaults) == "risefall":
         print(f"rise = {format_number(float(defaults['rise_ms']))} ms")
@@ -601,6 +639,9 @@ def create_argument_parser(language: str) -> argparse.ArgumentParser:
     parser.add_argument("-timebase", type=parse_time_to_ms, help=tr(language, "timebase_help"))
     parser.add_argument("-interval", type=parse_time_to_ms, help=tr(language, "interval_help"))
     parser.add_argument("-phase", type=parse_time_to_ms, help=tr(language, "phase_help"))
+    invert_group = parser.add_mutually_exclusive_group()
+    invert_group.add_argument("-invert", dest="invert", action="store_true", default=None, help=tr(language, "invert_help"))
+    invert_group.add_argument("-noinvert", dest="invert", action="store_false", help=tr(language, "noinvert_help"))
     parser.add_argument("-clock", nargs=3, metavar=("LOW_TIME", "HIGH_TIME", "CLOCKS"), help=tr(language, "clock_help"))
     parser.add_argument("-edgepos", choices=VALID_EDGEPOS, help=tr(language, "edgepos_help"))
     parser.add_argument("-ramp", help=tr(language, "ramp_help"))
@@ -621,6 +662,7 @@ def build_config(args: argparse.Namespace, defaults: dict, language: str, argv: 
     timebase_ms = args.timebase if args.timebase is not None else float(defaults["timebase_ms"])
     interval_ms = args.interval if args.interval is not None else float(defaults["interval_ms"])
     phase_ms = args.phase if args.phase is not None else float(defaults["phase_ms"])
+    invert = args.invert if args.invert is not None else bool(defaults["invert"])
     edgepos = args.edgepos if args.edgepos is not None else defaults["edgepos"]
     output_language = args.language if args.language is not None else language
 
@@ -641,6 +683,7 @@ def build_config(args: argparse.Namespace, defaults: dict, language: str, argv: 
         "timebase_ms": timebase_ms,
         "interval_ms": interval_ms,
         "phase_ms": phase_ms,
+        "invert": invert,
         "edgepos": edgepos,
         "ramp_raw": ramp_source,
         "rise_ms": rise_ms,
@@ -710,6 +753,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 edgepos=config["edgepos"],
                 high_v=config["high_v"],
                 low_v=config["low_v"],
+                invert=config["invert"],
                 language=language,
                 phase_ms=config["phase_ms"],
             )
@@ -730,6 +774,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             edgepos=config["edgepos"],
             high_v=config["high_v"],
             low_v=config["low_v"],
+            invert=config["invert"],
             language=language,
             phase_ms=config["phase_ms"],
         )
