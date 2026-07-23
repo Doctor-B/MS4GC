@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MS4GC - MakeSignal4GoConfigure
-Version 1.06
+Version 1.06a
 
 Generate time/voltage point pairs for custom signal definitions.
 """
@@ -21,7 +21,7 @@ from typing import Iterable, Sequence
 
 PROGRAM_NAME = "MS4GC"
 PROGRAM_LONG_NAME = "MakeSignal4GoConfigure"
-VERSION = "1.06"
+VERSION = "1.06a"
 DEFAULT_FILE = "MS4GCdefault.json"
 VALID_LANGUAGES = ("en", "de")
 VALID_EDGEPOS = ("start", "center", "end")
@@ -32,7 +32,6 @@ BUILTIN_DEFAULTS = {
     "timebase_ms": 1.0,
     "interval_ms": 20.0,
     "phase_ms": 0.0,
-    "invert": False,
     "ramp": "1%",
     "edgepos": "center",
     "high_v": 5.0,
@@ -47,8 +46,7 @@ TEXT = {
         "timebase_help": "timebase for bit signals and percentage ramps, default 1ms. Examples: 1ms, 10us, 0.5s",
         "interval_help": "output interval for bit signals, default 20ms",
         "phase_help": "shift the whole signal in time. Positive values delay the signal, negative values advance it. Examples: -2ms, 0.5ms",
-        "invert_help": "invert the logical signal states before transition generation. Timing remains unchanged; high and low states are exchanged.",
-        "noinvert_help": "disable signal inversion, including an inversion stored in MS4GCdefault.json",
+        "invert_help": "invert the logical signal states for this run before transition generation. Timing remains unchanged; high and low states are exchanged. This option is not stored in MS4GCdefault.json.",
         "clock_help": "generate a low/high clock signal. LOW_TIME and HIGH_TIME are times; CLOCKS is the number of low-high cycles. Example: -clock 0.48 0.51 20",
         "edgepos_help": "position of the ideal switching time relative to the transition: start, center, or end. Default: center",
         "ramp_help": "rise/fall ramp, default 1%% of timebase. Examples: 1%%, 0.01ms, 10us",
@@ -97,8 +95,7 @@ TEXT = {
         "timebase_help": "Zeitbasis für Bitfolgen und Prozent-Rampen, default 1ms. Beispiele: 1ms, 10us, 0.5s",
         "interval_help": "Ausgabeintervall für Bitfolgen, default 20ms",
         "phase_help": "verschiebt das gesamte Signal zeitlich. Positive Werte verzögern, negative Werte ziehen vor. Beispiele: -2ms, 0.5ms",
-        "invert_help": "invertiert die logischen Signalzustände vor der Flankenerzeugung. Der zeitliche Verlauf bleibt unverändert; High und Low werden vertauscht.",
-        "noinvert_help": "deaktiviert die Signalinvertierung, auch wenn sie in MS4GCdefault.json gespeichert ist",
+        "invert_help": "invertiert die logischen Signalzustände nur für diesen Aufruf vor der Flankenerzeugung. Der zeitliche Verlauf bleibt unverändert; High und Low werden vertauscht. Diese Option wird nicht in MS4GCdefault.json gespeichert.",
         "clock_help": "erzeugt ein Low-/High-Taktsignal. LOW_TIME und HIGH_TIME sind Zeiten; CLOCKS ist die Anzahl der Low-High-Zyklen. Beispiel: -clock 0.48 0.51 20",
         "edgepos_help": "Position des idealen Umschaltzeitpunkts relativ zur Flanke: start, center oder end. Default: center",
         "ramp_help": "Rise/Fall-Rampe, default 1%% von timebase. Beispiele: 1%%, 0.01ms, 10us",
@@ -206,9 +203,6 @@ def normalize_defaults(data: dict) -> dict:
     for key in ("timebase_ms", "interval_ms", "phase_ms", "high_v", "low_v"):
         if key in data:
             defaults[key] = data[key]
-
-    if "invert" in data:
-        defaults["invert"] = normalize_bool(data["invert"])
 
     if "language" in data:
         defaults["language"] = normalize_language(data["language"])
@@ -595,7 +589,6 @@ def save_defaults(config: dict, language: str) -> None:
         "timebase_ms": config["timebase_ms"],
         "interval_ms": config["interval_ms"],
         "phase_ms": config["phase_ms"],
-        "invert": config["invert"],
         "edgepos": config["edgepos"],
         "high_v": config["high_v"],
         "low_v": config["low_v"],
@@ -621,7 +614,6 @@ def show_defaults(defaults: dict, language: str) -> None:
     print(f"timebase = {format_number(float(defaults['timebase_ms']))} ms")
     print(f"interval = {format_number(float(defaults['interval_ms']))} ms")
     print(f"phase = {format_number(float(defaults['phase_ms']))} ms")
-    print(f"invert = {str(bool(defaults['invert'])).lower()}")
     print(f"edgepos = {defaults['edgepos']}")
     if ramp_mode_from_defaults(defaults) == "risefall":
         print(f"rise = {format_number(float(defaults['rise_ms']))} ms")
@@ -639,9 +631,7 @@ def create_argument_parser(language: str) -> argparse.ArgumentParser:
     parser.add_argument("-timebase", type=parse_time_to_ms, help=tr(language, "timebase_help"))
     parser.add_argument("-interval", type=parse_time_to_ms, help=tr(language, "interval_help"))
     parser.add_argument("-phase", type=parse_time_to_ms, help=tr(language, "phase_help"))
-    invert_group = parser.add_mutually_exclusive_group()
-    invert_group.add_argument("-invert", dest="invert", action="store_true", default=None, help=tr(language, "invert_help"))
-    invert_group.add_argument("-noinvert", dest="invert", action="store_false", help=tr(language, "noinvert_help"))
+    parser.add_argument("-invert", action="store_true", help=tr(language, "invert_help"))
     parser.add_argument("-clock", nargs=3, metavar=("LOW_TIME", "HIGH_TIME", "CLOCKS"), help=tr(language, "clock_help"))
     parser.add_argument("-edgepos", choices=VALID_EDGEPOS, help=tr(language, "edgepos_help"))
     parser.add_argument("-ramp", help=tr(language, "ramp_help"))
@@ -662,7 +652,7 @@ def build_config(args: argparse.Namespace, defaults: dict, language: str, argv: 
     timebase_ms = args.timebase if args.timebase is not None else float(defaults["timebase_ms"])
     interval_ms = args.interval if args.interval is not None else float(defaults["interval_ms"])
     phase_ms = args.phase if args.phase is not None else float(defaults["phase_ms"])
-    invert = args.invert if args.invert is not None else bool(defaults["invert"])
+    invert = bool(args.invert)
     edgepos = args.edgepos if args.edgepos is not None else defaults["edgepos"]
     output_language = args.language if args.language is not None else language
 

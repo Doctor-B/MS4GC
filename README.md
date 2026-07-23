@@ -6,7 +6,7 @@ It can create signals from binary sequences such as `0011010` or generate period
 
 The generated `.dat` files can be written either with a traceable parameter header or as plain point pairs using `-noheader`. Plain point-pair output is intended for direct import into signal-definition tools. The primary target use case is Renesas Go Configure™ Software Hub, for example when configuring a voltage source with a custom-signal import workflow such as “Custom Signal” / “Import Points”, depending on the installed Go Configure version and the selected device family.
 
-MS4GC supports configurable high and low voltage levels, negative voltages, custom rise and fall times, logical signal inversion, default settings stored in `MS4GCdefault.json`, edge positioning modes, language selection, and phase shifting.
+MS4GC supports configurable high and low voltage levels, negative voltages, custom rise and fall times, intentional per-run logical signal inversion, default settings stored in `MS4GCdefault.json`, edge positioning modes, language selection, and phase shifting.
 
 German documentation is available in [`README.de.md`](README.de.md).
 
@@ -16,7 +16,7 @@ German documentation is available in [`README.de.md`](README.de.md).
 - Generate clock signals with `-clock LOW_TIME HIGH_TIME CLOCKS`
 - Configure `timebase`, `interval`, `ramp`, `rise`, `fall`, `high`, and `low`
 - Shift the generated signal with `-phase`
-- Invert logical high/low states with `-invert`
+- Intentionally invert logical high/low states for a single run with `-invert`
 - Select edge alignment with `-edgepos start|center|end`
 - Store defaults in `MS4GCdefault.json`
 - English default language, optional German output with `-language de`
@@ -55,7 +55,6 @@ language = en
 timebase = 1.0 ms
 interval = 20.0 ms
 phase = 0.0 ms
-invert = false
 edgepos = center
 ramp = 1%
 high = 5.0 V
@@ -73,7 +72,7 @@ python MS4GC.py -file Signal 0011010
 Example header:
 
 ```text
-MS4GC Version 1.06
+MS4GC Version 1.06a
 command = MS4GC -file Signal 0011010
 language = en
 timebase = 1.0 [ms]
@@ -199,11 +198,7 @@ Inversion is performed before applying `rise` and `fall`. Therefore, a transitio
 
 In clock mode, the time structure is preserved: the signal starts high, changes to low after `LOW_TIME`, and changes back to high after `HIGH_TIME`. A different interpretation of clock phase lengths can be added later as a separate option.
 
-The inversion state can be stored in `MS4GCdefault.json`. Use `-noinvert` to explicitly disable a stored inversion:
-
-```bash
-python MS4GC.py -noinvert -save
-```
+`-invert` is intentionally not stored in `MS4GCdefault.json`. It must be supplied explicitly for each run that should be inverted. This avoids surprising output caused by a previously saved inversion setting.
 
 ## Rise, fall, and ramp
 
@@ -244,19 +239,18 @@ python MS4GC.py -show
 Save current values as defaults:
 
 ```bash
-python MS4GC.py -language de -timebase 2ms -phase -0.5ms -invert -edgepos center -ramp 2% -save
+python MS4GC.py -language de -timebase 2ms -phase -0.5ms -edgepos center -ramp 2% -save
 ```
 
 Example default file:
 
 ```json
 {
-    "version": "1.06",
+    "version": "1.06a",
     "language": "de",
     "timebase_ms": 2.0,
     "interval_ms": 20.0,
     "phase_ms": -0.5,
-    "invert": true,
     "edgepos": "center",
     "high_v": 5.0,
     "low_v": 0.0,
@@ -264,7 +258,7 @@ Example default file:
 }
 ```
 
-If `language` is missing, English is used. If `invert` is missing, inversion is disabled.
+If `language` is missing, English is used. A legacy `invert` entry in `MS4GCdefault.json` is ignored; inversion is only active when `-invert` is used on the command line.
 
 ## Help and version
 
@@ -284,7 +278,7 @@ python -m unittest discover -s tests
 
 ## Development note
 
-This project was developed by Andreas Beck with assistance from OpenAI ChatGPT. The generated code, documentation, and examples were reviewed and adapted by the repository owner before publication.
+This project was developed by Peter Beck with assistance from OpenAI ChatGPT. The generated code, documentation, and examples were reviewed and adapted by the repository owner before publication.
 
 ## License
 

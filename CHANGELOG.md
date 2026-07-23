@@ -1,13 +1,20 @@
 # Changelog
 
+## 1.06a
+
+- Kept `-invert` as an explicit per-run option.
+- Removed saving and loading of `invert` from `MS4GCdefault.json`.
+- Removed `-noinvert`, because inversion is no longer a stored default.
+- Legacy `invert` entries in existing default files are ignored.
+- Updated documentation and tests for the new explicit-only inversion behavior.
+
 ## 1.06
 
 - Added `-invert` to exchange logical high and low signal states.
-- Inversion is applied before transition generation, so configured `rise` and `fall` times follow the physical edge direction.
-- Clock inversion preserves the existing time structure while exchanging logical states.
-- Added `-noinvert` to disable an inversion stored in `MS4GCdefault.json`.
-- Added `invert` to saved defaults and traceable output headers.
-- Added inversion examples and automated tests.
+- Inversion is applied before transition generation so `rise` and `fall` match the actual generated edge direction.
+- Clock inversion preserves the existing timing structure and swaps logical states.
+- Added traceable output header entry for the runtime inversion state.
+- Added examples and tests for inverted bit signals and clock signals.
 
 ## 1.05
 

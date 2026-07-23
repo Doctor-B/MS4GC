@@ -6,7 +6,7 @@ Das Programm kann aus Bitfolgen wie `0011010` eine Signaldatei erzeugen oder mit
 
 Die erzeugten `.dat`-Dateien können entweder mit einem nachvollziehbaren Parameter-Header oder mit `-noheader` als reine Wertepaare geschrieben werden. Die reine Wertepaarausgabe ist für den direkten Import in Signaldefinitions-Werkzeuge gedacht. Der primäre Anwendungsfall ist Renesas Go Configure™ Software Hub, zum Beispiel zur Konfiguration einer Spannungsquelle über einen Custom-Signal-Import wie „Custom Signal“ / „Import Points“, abhängig von der installierten Go-Configure-Version und der ausgewählten Bauteilfamilie.
 
-MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, individuelle Rise- und Fall-Zeiten, logische Signalinvertierung, Defaultwerte in `MS4GCdefault.json`, Flankenpositionen, Sprachauswahl und Phasenverschiebung.
+MS4GC unterstützt konfigurierbare High- und Low-Pegel, negative Spannungen, individuelle Rise- und Fall-Zeiten, absichtlich pro Aufruf aktivierte logische Signalinvertierung, Defaultwerte in `MS4GCdefault.json`, Flankenpositionen, Sprachauswahl und Phasenverschiebung.
 
 Die englische Hauptdokumentation steht in [`README.md`](README.md).
 
@@ -16,7 +16,7 @@ Die englische Hauptdokumentation steht in [`README.md`](README.md).
 - Erzeugung von Taktsignalen mit `-clock LOW_TIME HIGH_TIME CLOCKS`
 - Konfiguration von `timebase`, `interval`, `ramp`, `rise`, `fall`, `high` und `low`
 - Zeitliche Verschiebung des Signals mit `-phase`
-- Invertierung der logischen High-/Low-Zustände mit `-invert`
+- absichtliche Invertierung der logischen High-/Low-Zustände für einen einzelnen Aufruf mit `-invert`
 - Wahl der Flankenposition mit `-edgepos start|center|end`
 - Speicherung von Defaultwerten in `MS4GCdefault.json`
 - Englisch als Standardsprache, Deutsch mit `-language de`
@@ -55,7 +55,6 @@ language = en
 timebase = 1.0 ms
 interval = 20.0 ms
 phase = 0.0 ms
-invert = false
 edgepos = center
 ramp = 1%
 high = 5.0 V
@@ -73,7 +72,7 @@ python MS4GC.py -file Signal 0011010
 Beispiel-Header:
 
 ```text
-MS4GC Version 1.06
+MS4GC Version 1.06a
 command = MS4GC -file Signal 0011010
 language = en
 timebase = 1.0 [ms]
@@ -199,11 +198,7 @@ Die Invertierung erfolgt vor der Anwendung von `rise` und `fall`. Wird eine Flan
 
 Im Clock-Modus bleibt die Zeitstruktur erhalten: Das Signal beginnt High, wechselt nach `LOW_TIME` zu Low und nach `HIGH_TIME` wieder zu High. Eine andere Interpretation der Clock-Zeitabschnitte kann später über eine getrennte Option ergänzt werden.
 
-Der Invertierungszustand kann in `MS4GCdefault.json` gespeichert werden. Mit `-noinvert` lässt sich eine gespeicherte Invertierung ausdrücklich deaktivieren:
-
-```bash
-python MS4GC.py -noinvert -save
-```
+`-invert` wird absichtlich nicht in `MS4GCdefault.json` gespeichert. Die Option muss bei jedem Aufruf ausdrücklich angegeben werden, wenn das Signal invertiert werden soll. Dadurch werden überraschende Ausgaben durch eine früher gespeicherte Invertierung vermieden.
 
 ## Rise, Fall und Ramp
 
@@ -244,19 +239,18 @@ python MS4GC.py -show
 Aktuelle Werte speichern:
 
 ```bash
-python MS4GC.py -language de -timebase 2ms -phase -0.5ms -invert -edgepos center -ramp 2% -save
+python MS4GC.py -language de -timebase 2ms -phase -0.5ms -edgepos center -ramp 2% -save
 ```
 
 Beispiel:
 
 ```json
 {
-    "version": "1.06",
+    "version": "1.06a",
     "language": "de",
     "timebase_ms": 2.0,
     "interval_ms": 20.0,
     "phase_ms": -0.5,
-    "invert": true,
     "edgepos": "center",
     "high_v": 5.0,
     "low_v": 0.0,
@@ -264,7 +258,7 @@ Beispiel:
 }
 ```
 
-Fehlt `language`, wird Englisch verwendet. Fehlt `invert`, ist die Invertierung deaktiviert.
+Fehlt `language`, wird Englisch verwendet. Ein alter `invert`-Eintrag in `MS4GCdefault.json` wird ignoriert; Invertierung ist nur aktiv, wenn `-invert` in der Kommandozeile angegeben wird.
 
 ## Hilfe und Version
 
@@ -284,7 +278,7 @@ python -m unittest discover -s tests
 
 ## Hinweis zur Erstellung
 
-Dieses Projekt wurde von Andreas Beck mit Unterstützung von OpenAI ChatGPT entwickelt. Der erzeugte Code, die Dokumentation und die Beispiele wurden vor der Veröffentlichung vom Repository-Inhaber geprüft und angepasst.
+Dieses Projekt wurde von Peter Beck mit Unterstützung von OpenAI ChatGPT entwickelt. Der erzeugte Code, die Dokumentation und die Beispiele wurden vor der Veröffentlichung vom Repository-Inhaber geprüft und angepasst.
 
 ## Lizenz
 

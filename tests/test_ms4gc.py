@@ -110,7 +110,7 @@ class TestMS4GC(unittest.TestCase):
                     data = json.load(handle)
                 self.assertEqual(data["language"], "de")
                 self.assertAlmostEqual(data["phase_ms"], -0.5)
-                self.assertEqual(data["version"], "1.06")
+                self.assertEqual(data["version"], "1.06a")
             finally:
                 os.chdir(old_cwd)
 
@@ -174,7 +174,7 @@ class TestMS4GC(unittest.TestCase):
             self.assertAlmostEqual(actual[0], wanted[0])
             self.assertAlmostEqual(actual[1], wanted[1])
 
-    def test_invert_can_be_saved_and_disabled(self):
+    def test_invert_is_not_saved_to_defaults(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
@@ -183,13 +183,22 @@ class TestMS4GC(unittest.TestCase):
                     self.assertEqual(MS4GC.main(["-invert", "-save"]), 0)
                 with open("MS4GCdefault.json", "r", encoding="utf-8") as handle:
                     data = json.load(handle)
-                self.assertTrue(data["invert"])
+                self.assertNotIn("invert", data)
+                self.assertEqual(data["version"], "1.06a")
+            finally:
+                os.chdir(old_cwd)
 
-                with redirect_stdout(io.StringIO()):
-                    self.assertEqual(MS4GC.main(["-noinvert", "-save"]), 0)
-                with open("MS4GCdefault.json", "r", encoding="utf-8") as handle:
-                    data = json.load(handle)
-                self.assertFalse(data["invert"])
+    def test_legacy_saved_invert_is_ignored(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                with open("MS4GCdefault.json", "w", encoding="utf-8") as handle:
+                    json.dump({"invert": True, "ramp": "1%"}, handle)
+                buffer = io.StringIO()
+                with redirect_stdout(buffer):
+                    self.assertEqual(MS4GC.main(["-noheader", "001"]), 0)
+                self.assertTrue(buffer.getvalue().startswith("0.0 0.0"))
             finally:
                 os.chdir(old_cwd)
 
